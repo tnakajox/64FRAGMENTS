@@ -1,0 +1,997 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>64 FRAGMENTS — NAKAJOX EXPERIMENT 005</title>
+
+    <style>
+      :root {
+        --bg: #080808;
+        --fg: #ededed;
+        --muted: #777;
+        --line: #292929;
+        --accent: #d5ff3f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family:
+          Arial, "Helvetica Neue", "Hiragino Sans", "Noto Sans JP", sans-serif;
+        letter-spacing: 0.02em;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      header {
+        padding: 25px 5vw 20px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .brand {
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        color: #aaa;
+      }
+
+      .experiment {
+        font-size: 10px;
+        letter-spacing: 0.2em;
+        color: var(--muted);
+      }
+
+      main {
+        width: min(1100px, 90vw);
+        margin: 0 auto;
+      }
+
+      .hero {
+        padding: 52px 0 28px;
+      }
+
+      .eyebrow {
+        font-size: 10px;
+        letter-spacing: 0.25em;
+        color: var(--accent);
+        margin-bottom: 14px;
+      }
+
+      h1 {
+        font-size: clamp(38px, 8vw, 86px);
+        line-height: 0.95;
+        letter-spacing: -0.06em;
+        margin: 0;
+        font-weight: 700;
+      }
+
+      .subtitle {
+        color: #888;
+        font-size: 12px;
+        letter-spacing: 0.22em;
+        margin-top: 14px;
+      }
+
+      /* HERO STATEMENT (一言で刺さるメインメッセージ) */
+      .hero-statement {
+        margin-top: 32px;
+        padding-left: 18px;
+        border-left: 2px solid var(--accent);
+        max-width: 740px;
+      }
+
+      .hero-question {
+        font-size: clamp(19px, 2.8vw, 27px);
+        font-weight: 600;
+        line-height: 1.5;
+        color: #ffffff;
+        margin: 0;
+        letter-spacing: 0.03em;
+      }
+
+      .hero-question-en {
+        font-size: 12px;
+        letter-spacing: 0.16em;
+        color: var(--accent);
+        margin: 6px 0 14px;
+        font-style: italic;
+      }
+
+      .hero-lead {
+        font-size: 13.5px;
+        line-height: 1.95;
+        color: #b8b8b8;
+        margin: 0;
+      }
+
+      .stage-wrap {
+        position: relative;
+        width: 100%;
+        margin: 28px auto 0;
+      }
+
+      .stage {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        background: #111;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid #333;
+      }
+
+      .grid {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        grid-template-rows: repeat(8, 1fr);
+        gap: 2px;
+        background: #080808;
+      }
+
+      .tile {
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        background: #141414;
+      }
+
+      .tile canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: fill;
+      }
+
+      .stage.monochrome canvas {
+        filter: grayscale(1) contrast(1.12);
+      }
+
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(8, 8, 8, 0.88);
+        z-index: 5;
+        text-align: center;
+        padding: 24px;
+      }
+
+      .overlay.hidden {
+        display: none;
+      }
+
+      .overlay-inner {
+        max-width: 440px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .overlay-title {
+        color: var(--accent);
+        font-size: 11px;
+        letter-spacing: 0.24em;
+        margin-bottom: 14px;
+      }
+
+      .overlay-text {
+        color: #b5b5b5;
+        font-size: 12.5px;
+        line-height: 1.95;
+        margin-bottom: 24px;
+        white-space: pre-line;
+      }
+
+      .center-start-btn {
+        background: var(--accent);
+        color: #080808;
+        border: 1px solid var(--accent);
+        padding: 15px 32px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        cursor: pointer;
+        transition:
+          transform 0.15s ease,
+          background 0.2s ease,
+          border-color 0.2s ease;
+      }
+
+      .center-start-btn:hover {
+        background: #ffffff;
+        border-color: #ffffff;
+        transform: translateY(-1px);
+      }
+
+      .center-start-btn.hidden {
+        display: none;
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .control-button {
+        background: transparent;
+        color: var(--fg);
+        border: 1px solid #555;
+        padding: 12px 17px;
+        font-size: 10px;
+        letter-spacing: 0.13em;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+
+      .control-button:hover {
+        color: var(--accent);
+        border-color: var(--accent);
+      }
+
+      .control-button.active {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .control-button.hidden {
+        display: none;
+      }
+
+      .status {
+        margin-left: auto;
+        font-size: 10px;
+        color: var(--muted);
+        letter-spacing: 0.1em;
+      }
+
+      .status span {
+        color: var(--accent);
+      }
+
+      .caption {
+        display: flex;
+        justify-content: space-between;
+        gap: 15px;
+        margin-top: 12px;
+        font-size: 9px;
+        letter-spacing: 0.15em;
+        color: #777;
+      }
+
+      .content {
+        padding: 80px 0 70px;
+        border-top: 1px solid var(--line);
+        margin-top: 75px;
+      }
+
+      .section-label {
+        font-size: 10px;
+        letter-spacing: 0.2em;
+        color: var(--accent);
+        margin-bottom: 22px;
+      }
+
+      .content h2 {
+        font-size: clamp(22px, 3.6vw, 34px);
+        line-height: 1.35;
+        letter-spacing: -0.02em;
+        margin: 0 0 10px;
+        font-weight: 500;
+      }
+
+      .en-sub {
+        font-size: 13px;
+        letter-spacing: 0.14em;
+        color: #888;
+        font-style: italic;
+        margin: 0 0 28px;
+      }
+
+      .statement {
+        max-width: 760px;
+        font-size: 14px;
+        line-height: 2.15;
+        color: #c7c7c7;
+      }
+
+      .statement p {
+        margin: 0 0 20px;
+      }
+
+      .statement strong {
+        color: #fff;
+        font-weight: 500;
+      }
+
+      .theory-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1px;
+        background: var(--line);
+        margin-top: 36px;
+        border: 1px solid var(--line);
+      }
+
+      .theory-card {
+        background: var(--bg);
+        padding: 27px;
+      }
+
+      .theory-card h3 {
+        font-size: 14px;
+        font-weight: 500;
+        margin: 0 0 15px;
+        color: #fff;
+      }
+
+      .theory-card p {
+        font-size: 12px;
+        line-height: 2;
+        color: #999;
+        margin: 0;
+      }
+
+      .note {
+        color: #777;
+        font-size: 11px;
+        line-height: 1.9;
+        margin-top: 25px;
+        max-width: 760px;
+      }
+
+      .tech {
+        border-top: 1px solid var(--line);
+        padding-top: 30px;
+        margin-top: 45px;
+      }
+
+      .tech h3 {
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        color: #aaa;
+        font-weight: 500;
+        margin-bottom: 15px;
+      }
+
+      .tech p {
+        font-size: 11px;
+        color: #777;
+        line-height: 2;
+        max-width: 760px;
+      }
+
+      footer {
+        border-top: 1px solid var(--line);
+        padding: 25px 5vw;
+        display: flex;
+        justify-content: space-between;
+        color: #666;
+        font-size: 9px;
+        letter-spacing: 0.15em;
+      }
+
+      @media (max-width: 650px) {
+        header {
+          padding: 18px 5vw;
+        }
+
+        .hero {
+          padding-top: 36px;
+        }
+
+        .content {
+          margin-top: 55px;
+          padding-top: 55px;
+        }
+
+        .theory-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .status {
+          width: 100%;
+          margin: 8px 0 0;
+        }
+
+        .control-button {
+          padding: 11px 12px;
+          font-size: 9px;
+        }
+
+        .caption {
+          font-size: 8px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <div class="brand">NAKAJOX EXPERIMENT</div>
+      <div class="experiment">DIGITAL ART / 005</div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="eyebrow">EXPERIMENT 005</div>
+        <h1>64 FRAGMENTS</h1>
+        <div class="subtitle">THE FRAGMENTED SELF</div>
+
+        <div class="hero-statement">
+          <p class="hero-question">
+            時間をずらしても、人はそれを「自分」と認識するのか。
+          </p>
+          <div class="hero-question-en">Is Shifted Time Still You?</div>
+          <p class="hero-lead">
+            私たちは、自分をひとつの存在として認識している。<br />
+            しかし、その自分を構成しているのは、異なる時間に存在した無数の瞬間なのかもしれないよ。
+          </p>
+        </div>
+      </section>
+
+      <section class="stage-wrap">
+        <div class="stage monochrome" id="stage">
+          <div class="grid" id="grid"></div>
+
+          <div class="overlay" id="overlay">
+            <div class="overlay-inner">
+              <div class="overlay-title" id="overlayTitle">
+                CAMERA ACCESS REQUIRED
+              </div>
+              <div class="overlay-text" id="overlayText">
+                カメラを起動してください。
+                あなたの姿が大小異なる時間の断片へと分解されます。
+              </div>
+              <button
+                class="center-start-btn"
+                id="centerStartButton"
+                type="button"
+              >
+                START CAMERA
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button class="control-button hidden" id="stopButton" type="button">
+            STOP CAMERA
+          </button>
+
+          <button class="control-button active" id="monoButton" type="button">
+            MONOCHROME: ON
+          </button>
+
+          <button class="control-button" id="shuffleButton" type="button">
+            RE-DIVIDE GRID
+          </button>
+
+          <button class="control-button" id="restoreButton" type="button">
+            UNIFORM 8×8
+          </button>
+
+          <button class="control-button" id="fullscreenButton" type="button">
+            FULLSCREEN
+          </button>
+
+          <div class="status" id="status"><span>●</span> STANDBY</div>
+        </div>
+
+        <div class="caption">
+          <span id="gridCaption"
+            >ASYMMETRIC TEMPORAL FRAGMENTS / 64-UNIT BASE</span
+          >
+          <span>LIVE CAMERA INPUT</span>
+        </div>
+      </section>
+
+      <section class="content">
+        <div class="section-label">01 / STATEMENT</div>
+        <h2>過去の自分は、今の自分と同じ人間なのか。</h2>
+        <div class="en-sub">Is My Past Self Still Me?</div>
+
+        <div class="statement">
+          <p>
+            私たちは、自分をひとつの存在として認識している。<br />
+            しかし、その自分を構成しているのは、異なる時間に存在した無数の瞬間なのかもしれないよ。
+          </p>
+
+          <p>
+            本作『64
+            FRAGMENTS』は、カメラに映るあなたの姿を大小さまざまな時間の断片に分割し、
+            それぞれに数秒前までの「過去のあなた」を割り当てる。
+            あなたが動けば身体は時間の層へとほどけ、あなたが静止すれば、すべての断片が追いつき、再びひとりの肖像へと収束していく。
+          </p>
+        </div>
+
+        <div class="section-label" style="margin-top: 70px">
+          02 / THEORETICAL BACKGROUND
+        </div>
+
+        <h2>「私」は、どこに存在するのか。</h2>
+
+        <div class="theory-grid">
+          <div class="theory-card">
+            <h3>01 — DAVID HUME / BUNDLE THEORY</h3>
+            <p>
+              哲学者デイヴィッド・ヒュームは、
+              変化しない固定的な自己を見つけることはできず、
+              私たちが自己と呼ぶものは、知覚や経験の束として
+              捉えられると論じた。 本作は、ひとりの人間を異なる時間の断片として
+              同時に提示することで、この考えを視覚化する。
+            </p>
+          </div>
+
+          <div class="theory-card">
+            <h3>02 — BUDDHISM / ANATTĀ</h3>
+            <p>
+              仏教の「無我」は、永遠不変で独立した自己が
+              存在するという見方を問い直す。
+              身体、感覚、認識、意識は常に変化している。
+              本作の断片化された肖像は、 固定された自己という感覚を揺さぶる。
+            </p>
+          </div>
+
+          <div class="theory-card">
+            <h3>03 — TEMPORAL PERCEPTION</h3>
+            <p>
+              私たちの視覚は、眼球の跳躍運動（サッカード）によって異なる位置や瞬間から得た情報を
+              統合することで、安定した世界を経験している。
+              本作では、その時間的な統合を逆転させ、
+              複数の瞬間をひとつの画面に共存させる。
+            </p>
+          </div>
+
+          <div class="theory-card">
+            <h3>04 — THE FRAGMENTED SELF</h3>
+            <p>
+              本作独自の解釈。 ひとりの人間は、ひとつの瞬間だけで
+              完成しているのではない。 過去、現在、変化し続ける身体。
+              それらの断片がつながることで、
+              私たちは自分をひとりの存在として認識しているのかもしれない。
+            </p>
+          </div>
+        </div>
+
+        <p class="note">
+          ※ ヒュームの思想、仏教の無我、視覚情報の時間的統合は、
+          本作を読み解くための理論的な視点である。
+          これらの理論が、人間の自己を文字どおり64個の断片として
+          証明しているわけではない。
+        </p>
+
+        <div class="tech">
+          <h3>03 / SYSTEM</h3>
+          <p>
+            A single live camera stream is divided into asymmetric spatial
+            fragments based on an 8×8 (64-unit) matrix. Each fragment samples a
+            different point in the recent past (up to 2.2 seconds), dissolving
+            linear time when the subject moves and converging back into a
+            unified portrait at rest.
+          </p>
+          <p>ONE CAMERA / 64-UNIT ASYMMETRIC MATRIX / TEMPORAL OFFSETS</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>NAKAJOX EXPERIMENT 005</span>
+      <span>THE FRAGMENTED SELF</span>
+    </footer>
+
+    <script>
+      const GRID_SIZE = 8;
+
+      const FRAME_WIDTH = 640;
+      const FRAME_HEIGHT = 480;
+
+      const CAPTURE_INTERVAL = 45;
+      const HISTORY_DURATION = 2600;
+      const MAX_DELAY = 2200;
+
+      const grid = document.getElementById("grid");
+      const stage = document.getElementById("stage");
+      const overlay = document.getElementById("overlay");
+      const overlayTitle = document.getElementById("overlayTitle");
+      const overlayText = document.getElementById("overlayText");
+      const status = document.getElementById("status");
+      const gridCaption = document.getElementById("gridCaption");
+
+      const centerStartButton = document.getElementById("centerStartButton");
+      const stopButton = document.getElementById("stopButton");
+      const monoButton = document.getElementById("monoButton");
+      const shuffleButton = document.getElementById("shuffleButton");
+      const restoreButton = document.getElementById("restoreButton");
+      const fullscreenButton = document.getElementById("fullscreenButton");
+
+      let video = null;
+      let stream = null;
+      let running = false;
+      let monochrome = true; // 初期状態からモノクロON
+      let isAsymmetric = true;
+
+      let frames = [];
+      let lastCapture = 0;
+      let startTime = 0;
+
+      let animationId = null;
+      let captureTimer = null;
+
+      let tiles = [];
+
+      // --------------------------------------------------
+      // BUILD GRID (RANDOM ASYMMETRIC OR UNIFORM 8x8)
+      // --------------------------------------------------
+
+      function generateTiles(asymmetric = true) {
+        grid.innerHTML = "";
+        tiles = [];
+
+        const occupied = Array.from({ length: GRID_SIZE }, () =>
+          Array(GRID_SIZE).fill(false),
+        );
+
+        for (let y = 0; y < GRID_SIZE; y++) {
+          for (let x = 0; x < GRID_SIZE; x++) {
+            if (occupied[y][x]) continue;
+
+            let w = 1;
+            let h = 1;
+
+            if (asymmetric) {
+              const r = Math.random();
+              if (r < 0.11) {
+                w = 2;
+                h = 2;
+              } else if (r < 0.28) {
+                w = 2;
+                h = 1;
+              } else if (r < 0.45) {
+                w = 1;
+                h = 2;
+              }
+
+              if (x + w > GRID_SIZE) w = 1;
+              if (y + h > GRID_SIZE) h = 1;
+
+              let free = true;
+              for (let yy = y; yy < y + h; yy++) {
+                for (let xx = x; xx < x + w; xx++) {
+                  if (occupied[yy][xx]) free = false;
+                }
+              }
+              if (!free) {
+                w = 1;
+                h = 1;
+              }
+            }
+
+            for (let yy = y; yy < y + h; yy++) {
+              for (let xx = x; xx < x + w; xx++) {
+                occupied[yy][xx] = true;
+              }
+            }
+
+            const tile = document.createElement("div");
+            tile.className = "tile";
+            tile.style.gridColumn = `${x + 1} / span ${w}`;
+            tile.style.gridRow = `${y + 1} / span ${h}`;
+
+            const canvas = document.createElement("canvas");
+            canvas.width = w * 110;
+            canvas.height = h * 82;
+
+            const ctx = canvas.getContext("2d", { alpha: false });
+            tile.appendChild(canvas);
+            grid.appendChild(tile);
+
+            const cx = x + w * 0.5;
+            const cy = y + h * 0.5;
+            const wave = (cx + cy * 0.72) / 13.72;
+            const jitter = Math.random();
+            const normalized = Math.min(
+              1,
+              Math.max(0, wave * 0.65 + jitter * 0.35),
+            );
+            const delay = Math.round(normalized * MAX_DELAY);
+
+            const zoom = 1.0 + Math.random() * 0.08;
+
+            tiles.push({
+              element: tile,
+              canvas,
+              ctx,
+              x,
+              y,
+              w,
+              h,
+              delay,
+              zoom,
+            });
+          }
+        }
+
+        gridCaption.textContent = asymmetric
+          ? `ASYMMETRIC TEMPORAL FRAGMENTS / ${tiles.length} TILES (64-UNIT BASE)`
+          : "64 TEMPORAL FRAGMENTS / UNIFORM 8 × 8";
+      }
+
+      generateTiles(true);
+
+      // --------------------------------------------------
+      // CAMERA
+      // --------------------------------------------------
+
+      async function startCamera() {
+        if (running) return;
+
+        try {
+          status.innerHTML = "<span>●</span> REQUESTING CAMERA";
+          centerStartButton.classList.add("hidden");
+
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 1280 },
+              height: { ideal: 960 },
+              facingMode: "user",
+            },
+            audio: false,
+          });
+
+          video = document.createElement("video");
+          video.srcObject = stream;
+          video.playsInline = true;
+          video.muted = true;
+
+          await video.play();
+
+          running = true;
+          frames = [];
+          startTime = performance.now();
+          lastCapture = 0;
+
+          stopButton.classList.remove("hidden");
+
+          overlayTitle.textContent = "BUFFERING TEMPORAL FRAGMENTS";
+          overlayText.textContent =
+            "時間の断片を蓄積しています。\n少しお待ちください。";
+          overlay.classList.remove("hidden");
+
+          captureTimer = setInterval(captureFrame, CAPTURE_INTERVAL);
+          animationId = requestAnimationFrame(render);
+        } catch (error) {
+          status.innerHTML = "<span>●</span> CAMERA ERROR";
+          overlayTitle.textContent = "CAMERA ACCESS FAILED";
+          overlayText.textContent =
+            "カメラへのアクセスを許可してください。\nHTTPSまたはlocalhost環境で実行してください。";
+          centerStartButton.textContent = "RETRY CAMERA";
+          centerStartButton.classList.remove("hidden");
+          overlay.classList.remove("hidden");
+          console.error(error);
+        }
+      }
+
+      // --------------------------------------------------
+      // CAPTURE FRAME
+      // --------------------------------------------------
+
+      function captureFrame() {
+        if (!running || !video || video.readyState < 2) return;
+
+        const now = performance.now();
+
+        const canvas = document.createElement("canvas");
+        canvas.width = FRAME_WIDTH;
+        canvas.height = FRAME_HEIGHT;
+
+        const ctx = canvas.getContext("2d", { alpha: false });
+
+        ctx.save();
+        ctx.translate(FRAME_WIDTH, 0);
+        ctx.scale(-1, 1);
+
+        const sourceWidth = video.videoWidth;
+        const sourceHeight = video.videoHeight;
+
+        const targetRatio = FRAME_WIDTH / FRAME_HEIGHT;
+        const sourceRatio = sourceWidth / sourceHeight;
+
+        let sx = 0;
+        let sy = 0;
+        let sw = sourceWidth;
+        let sh = sourceHeight;
+
+        if (sourceRatio > targetRatio) {
+          sw = sourceHeight * targetRatio;
+          sx = (sourceWidth - sw) / 2;
+        } else {
+          sh = sourceWidth / targetRatio;
+          sy = (sourceHeight - sh) / 2;
+        }
+
+        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, FRAME_WIDTH, FRAME_HEIGHT);
+        ctx.restore();
+
+        frames.push({ canvas, time: now });
+
+        const oldestAllowed = now - HISTORY_DURATION;
+        while (frames.length > 0 && frames[0].time < oldestAllowed) {
+          frames.shift();
+        }
+
+        lastCapture = now;
+      }
+
+      // --------------------------------------------------
+      // GET FRAME FROM THE PAST
+      // --------------------------------------------------
+
+      function getFrame(delay, now) {
+        const targetTime = now - delay;
+        for (let i = frames.length - 1; i >= 0; i--) {
+          if (frames[i].time <= targetTime) {
+            return frames[i].canvas;
+          }
+        }
+        return frames.length ? frames[0].canvas : null;
+      }
+
+      // --------------------------------------------------
+      // RENDER FRAGMENTS
+      // --------------------------------------------------
+
+      function render(now) {
+        if (!running) return;
+
+        const ready = frames.length > 0 && now - startTime >= MAX_DELAY;
+
+        if (!ready) {
+          const elapsed = Math.max(0, now - startTime);
+          const progress = Math.min(
+            100,
+            Math.floor((elapsed / MAX_DELAY) * 100),
+          );
+          status.innerHTML = "<span>●</span> BUFFERING " + progress + "%";
+          animationId = requestAnimationFrame(render);
+          return;
+        }
+
+        overlay.classList.add("hidden");
+        status.innerHTML = `<span>●</span> LIVE / ${tiles.length} TEMPORAL FRAGMENTS`;
+
+        for (const tile of tiles) {
+          const frame = getFrame(tile.delay, now);
+          if (!frame) continue;
+
+          const baseX = tile.x * (FRAME_WIDTH / GRID_SIZE);
+          const baseY = tile.y * (FRAME_HEIGHT / GRID_SIZE);
+          const baseW = tile.w * (FRAME_WIDTH / GRID_SIZE);
+          const baseH = tile.h * (FRAME_HEIGHT / GRID_SIZE);
+
+          const sw = baseW / tile.zoom;
+          const sh = baseH / tile.zoom;
+          const sx = baseX + (baseW - sw) / 2;
+          const sy = baseY + (baseH - sh) / 2;
+
+          tile.ctx.drawImage(
+            frame,
+            sx,
+            sy,
+            sw,
+            sh,
+            0,
+            0,
+            tile.canvas.width,
+            tile.canvas.height,
+          );
+        }
+
+        animationId = requestAnimationFrame(render);
+      }
+
+      // --------------------------------------------------
+      // GRID CONTROLS
+      // --------------------------------------------------
+
+      function rearrangeGrid() {
+        isAsymmetric = true;
+        generateTiles(true);
+        if (running) {
+          status.innerHTML = `<span>●</span> RE-DIVIDED (${tiles.length} FRAGMENTS)`;
+        }
+      }
+
+      function restoreUniformGrid() {
+        isAsymmetric = false;
+        generateTiles(false);
+        if (running) {
+          status.innerHTML = "<span>●</span> UNIFORM 8×8 GRID";
+        }
+      }
+
+      // --------------------------------------------------
+      // MONOCHROME
+      // --------------------------------------------------
+
+      function toggleMonochrome() {
+        monochrome = !monochrome;
+        stage.classList.toggle("monochrome", monochrome);
+        monoButton.classList.toggle("active", monochrome);
+        monoButton.textContent = monochrome
+          ? "MONOCHROME: ON"
+          : "MONOCHROME: OFF";
+      }
+
+      // --------------------------------------------------
+      // STOP CAMERA
+      // --------------------------------------------------
+
+      function stopCamera() {
+        running = false;
+
+        if (animationId) cancelAnimationFrame(animationId);
+        if (captureTimer) clearInterval(captureTimer);
+        if (stream) stream.getTracks().forEach((track) => track.stop());
+
+        frames = [];
+        stream = null;
+        video = null;
+
+        stopButton.classList.add("hidden");
+        centerStartButton.textContent = "START CAMERA";
+        centerStartButton.classList.remove("hidden");
+
+        status.innerHTML = "<span>●</span> STANDBY";
+        overlayTitle.textContent = "CAMERA STOPPED";
+        overlayText.textContent =
+          "START CAMERA を押して観測を再開してください。";
+        overlay.classList.remove("hidden");
+      }
+
+      // --------------------------------------------------
+      // FULLSCREEN
+      // --------------------------------------------------
+
+      async function toggleFullscreen() {
+        try {
+          if (!document.fullscreenElement) {
+            await stage.requestFullscreen();
+          } else {
+            await document.exitFullscreen();
+          }
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      // --------------------------------------------------
+      // EVENTS
+      // --------------------------------------------------
+
+      centerStartButton.addEventListener("click", startCamera);
+      stopButton.addEventListener("click", stopCamera);
+      monoButton.addEventListener("click", toggleMonochrome);
+      shuffleButton.addEventListener("click", rearrangeGrid);
+      restoreButton.addEventListener("click", restoreUniformGrid);
+      fullscreenButton.addEventListener("click", toggleFullscreen);
+    </script>
+  </body>
+</html>
