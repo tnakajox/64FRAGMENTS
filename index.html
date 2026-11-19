@@ -762,10 +762,10 @@ footer {
 
 <script>
 // ==================================================
-// 64 FRAGMENTS — script block (final)
-// ・全員が 0.0s〜2.2s のリアルタイムな時間差で連動（待ち時間なし）
-// ・BREATHING : 遅延の深さが波のようにゆっくり呼吸する
-// ・CANVAS POOL : メモリ負荷ゼロで60fps滑らか動作
+// 64 FRAGMENTS — script block (exhibition ready)
+// ・起動直後から即座に描画開始（待機画面なし・断片が徐々にほどける）
+// ・BREATHING   : 遅延の深さが波のようにゆっくり呼吸する
+// ・CANVAS POOL : フレーム用canvasを使い回し（メモリ約70MB固定）
 // ==================================================
 
 const GRID_SIZE = 8;
@@ -804,7 +804,6 @@ let isAsymmetric = true;
 
 let frames = [];
 let framePool = [];
-let startTime = 0;
 
 let animationId = null;
 let captureTimer = null;
@@ -950,13 +949,12 @@ async function startCamera() {
     running = true;
     frames = [];
     framePool = [];
-    startTime = performance.now();
+
+    // 最初の1フレーム目を即時キャプチャして待機画面をすぐ消す
+    captureFrame();
 
     stopButton.classList.remove("hidden");
-
-    overlayTitle.textContent = "BUFFERING TEMPORAL FRAGMENTS";
-    overlayText.textContent = "時間の断片を蓄積しています。\n少しお待ちください。";
-    overlay.classList.remove("hidden");
+    overlay.classList.add("hidden");
 
     captureTimer = setInterval(captureFrame, CAPTURE_INTERVAL);
     animationId = requestAnimationFrame(render);
@@ -974,7 +972,7 @@ async function startCamera() {
 }
 
 // --------------------------------------------------
-// CAPTURE FRAME (640x480 / 45ms)
+// CAPTURE FRAME (640x480 / 45ms / メモリ約70MB固定)
 // --------------------------------------------------
 
 function captureFrame() {
@@ -1041,17 +1039,11 @@ function getFrame(delay, now) {
 function render(now) {
   if (!running) return;
 
-  const ready = frames.length > 0 && now - startTime >= MAX_DELAY;
-
-  if (!ready) {
-    const elapsed = Math.max(0, now - startTime);
-    const progress = Math.min(100, Math.floor((elapsed / MAX_DELAY) * 100));
-    status.innerHTML = "<span>●</span> BUFFERING " + progress + "%";
+  if (frames.length === 0) {
     animationId = requestAnimationFrame(render);
     return;
   }
 
-  overlay.classList.add("hidden");
   status.innerHTML = `<span>●</span> LIVE / ${tiles.length} TEMPORAL FRAGMENTS`;
 
   for (const tile of tiles) {
