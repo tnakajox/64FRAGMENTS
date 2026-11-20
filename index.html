@@ -315,13 +315,13 @@ h1 {
 
 .statement {
   max-width: 760px;
-  font-size: 14px;
-  line-height: 2.15;
-  color: #c7c7c7;
+  font-size: 14.5px;
+  line-height: 2.2;
+  color: #d4d4d4;
 }
 
 .statement p {
-  margin: 0 0 20px;
+  margin: 0 0 22px;
 }
 
 .statement strong {
@@ -521,14 +521,14 @@ footer {
   <section class="hero">
     <div class="eyebrow">EXPERIMENT 005</div>
     <h1>64 FRAGMENTS</h1>
-    <div class="subtitle">THE FRAGMENTED SELF</div>
+    <div class="subtitle">I AM MADE OF EARLIER MOMENTS</div>
 
     <div class="hero-statement">
-      <p class="hero-question">過去の自分は、今の自分と同じ人間なのか。</p>
-      <div class="hero-question-en">Is My Past Self Still Me?</div>
+      <p class="hero-question">私は、いまこの瞬間にだけ存在するのか。</p>
+      <div class="hero-question-en">Do I Exist Only in This Moment?</div>
       <p class="hero-lead">
-        私たちは、自分をひとつの存在として認識している。<br>
-        しかし、その自分を構成しているのは、異なる時間に存在した無数の瞬間なのかもしれないよ。
+        動けば、私は時間にほどける。<br>
+        止まれば、ひとつになる。
       </p>
     </div>
   </section>
@@ -586,19 +586,22 @@ footer {
   <section class="content">
 
     <div class="section-label">01 / STATEMENT</div>
-    <h2>過去の自分は、今の自分と同じ人間なのか。</h2>
-    <div class="en-sub">Is My Past Self Still Me?</div>
+    <h2>いまの じぶんだけが、ほんとうの じぶんなの？</h2>
+    <div class="en-sub">Do I Exist Only in This Moment?</div>
 
     <div class="statement">
       <p>
-        私たちは、自分をひとつの存在として認識している。<br>
-        しかし、その自分を構成しているのは、異なる時間に存在した無数の瞬間なのかもしれないよ。
+        みんなは、じぶんのことを「ひとり」だと おもっているよね。<br>
+        でも、さっきの じぶんと、いまの じぶんは、ちょっとだけ ちがう。<br>
+        その ちがう じぶんたちが あつまって、「いまの じぶん」に なっているのかもしれない。
       </p>
 
       <p>
-        本作『64 FRAGMENTS』は、カメラに映るあなたの姿を大小さまざまな時間の断片に分割し、
-        それぞれに数秒前までの「過去のあなた」を割り当てる。
-        あなたが動けば身体は時間の層へとほどけ、あなたが静止すれば、すべての断片が追いつき、再びひとりの肖像へと収束していく。
+        この さくひんは、カメラに うつった あなたを、たくさんの しかくい かけらに わけるよ。<br>
+        そして、かけらごとに、ほんの すこしまえの あなたを うつすんだ。<br>
+        うごくと、あなたは バラバラの じかんに ほどけていく。<br>
+        じっと とまると、みんなが おいついて、また ひとりの あなたに もどるよ。<br>
+        ためしに、てを ふってみてね。
       </p>
     </div>
 
@@ -692,14 +695,14 @@ footer {
 
       <div class="math-card">
         <div>
-          <div class="math-label">02 / DELAY DISTRIBUTION</div>
+          <div class="math-label">02 / DELAY &amp; BREATHING</div>
           <div class="math-formula">
             \[
-            \tau_i = \mathrm{round}\!\left( 2200 \cdot \mathrm{clamp}(0.65\,w_i + 0.35\,r_i,\, 0,\, 1) \right)\ \mathrm{ms}
+            \tau_i(t) = \tau_{i,0} \cdot \left(1 - d + d \cdot \frac{1 + \sin(t / T_b + \phi_i)}{2}\right)
             \]
           </div>
           <p class="math-desc">
-            空間座標に基づく波の勾配 \(w_i\) と一様乱数 \(r_i \in [0,1)\) を合成し、各断片 \(i\) に \(0\) から最大 \(2200\ \mathrm{ms}\)（2.2秒前）までの時間遅延 \(\tau_i\) を割り当てる。
+            空間座標の勾配と乱数から決まる基準遅延 \(\tau_{i,0} \in [0, 2200]\ \mathrm{ms}\) に、緩やかな正弦波の揺らぎ（呼吸）を掛け合わせることで、時間の境界が有機的に脈動する。
           </p>
         </div>
       </div>
@@ -723,11 +726,11 @@ footer {
           <div class="math-label">04 / PAST FRAME RECONSTRUCTION</div>
           <div class="math-formula">
             \[
-            I_i(t) = F\!\left(\max\{t_k \mid t_k \le t - \tau_i\}\right)
+            I_i(t) = F\!\left(\max\{t_k \mid t_k \le t - \tau_i(t)\}\right)
             \]
           </div>
           <p class="math-desc">
-            現在時刻 \(t\) から遅延 \(\tau_i\) だけ遡った過去のフレーム \(F(t_k)\) を参照する。動きが止まり \(F(t) \approx F(t - \tau_i)\) となると、無数の過去が再びひとりの肖像へ収束する。
+            現在時刻 \(t\) から遅延 \(\tau_i(t)\) だけ遡った過去のフレーム \(F(t_k)\) を参照する。動きが止まり \(F(t) \approx F(t - \tau_i(t))\) となると、無数の過去が再びひとりの肖像へ収束する。
           </p>
         </div>
       </div>
