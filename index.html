@@ -791,10 +791,10 @@ footer {
 <script>
 // ==================================================
 // 64 FRAGMENTS — script block (Ars Electronica 2027 edition)
+// ・真っ暗フレーム防止：カメラ露出が立ち上がった有効フレームのみ深層記憶へ保存
 // ・時間の二層化 : 表層(2.6s・空間分割パーツ) + 深層(最大180s・4〜6マスのみ「数分前のカメラ全体」を内包)
 // ・起動直後の高速立ち上がり：最初の15秒は高密度に深層履歴を蓄積し、以降3分スケールへ移行
 // ・戻りきらない収束 : 静止すると表層は追いつくが、遅い層の「過去の全体像」だけが残り続ける
-// ・動きの累積量駆動 + 非周期ノイズ揺らぎ + 顔中心(現在寄り)/外周(過去寄り)
 // ==================================================
 
 const GRID_SIZE = 8;
@@ -852,7 +852,7 @@ let framePool = [];
 
 let deepFrames = [];
 let deepPool = [];
-let startTimestamp = 0;
+let validStartTimestamp = 0;
 let lastDeepCaptureTime = 0;
 
 let animationId = null;
@@ -998,8 +998,6 @@ function generateTiles(asymmetric = true) {
     }
   }
 
-  // 遅い層（カメラ全体像を映す小窓）の候補選定
-  // 全体像が歪まず見やすいよう、正方形に近いタイル（1×1 または 2×2）を優先して4〜6個選ぶ
   const deepCount = Math.min(
     tiles.length,
     DEEP_TILE_MIN + Math.floor(Math.random() * (DEEP_TILE_MAX - DEEP_TILE_MIN + 1))
@@ -1029,7 +1027,7 @@ function generateTiles(asymmetric = true) {
 generateTiles(true);
 
 // --------------------------------------------------
-// MOTION ANALYSIS
+// MOTION ANALYSIS & FRAME VALIDITY CHECK
 // --------------------------------------------------
 
 function updateMotionAccumulation(sourceCanvas, dtMs) {
@@ -1042,9 +1040,14 @@ function updateMotionAccumulation(sourceCanvas, dtMs) {
   const img = motionCtx.getImageData(0, 0, MOTION_W, MOTION_H).data;
 
   const rawLuma = new Float32Array(MOTION_W * MOTION_H);
+  let totalLuma = 0;
   for (let i = 0, p = 0; i < rawLuma.length; i++, p += 4) {
-    rawLuma[i] = img[p] * 0.299 + img[p + 1] * 0.587 + img[p + 2] * 0.114;
+    const l = img[p] * 0.299 + img[p + 1] * 0.587 + img[p + 2] * 0.114;
+    rawLuma[i] = l;
+    totalLuma += l;
   }
+
+  const avgBrightness = totalLuma / rawLuma.length;
 
   const blurred = new Float32Array(MOTION_W * MOTION_H);
   for (let y = 1; y < MOTION_H - 1; y++) {
@@ -1060,7 +1063,7 @@ function updateMotionAccumulation(sourceCanvas, dtMs) {
 
   if (!prevBlurredLuma) {
     prevBlurredLuma = blurred;
-    return;
+    return avgBrightness;
   }
 
   let diffSum = 0;
@@ -1102,6 +1105,8 @@ function updateMotionAccumulation(sourceCanvas, dtMs) {
     const decayRate = 0.08 + (1.0 - accumulatedMotion) * 0.22;
     accumulatedMotion = Math.max(0.0, accumulatedMotion - decayRate * (dtMs / 1000));
   }
+
+  return avgBrightness;
 }
 
 // --------------------------------------------------
@@ -1140,7 +1145,7 @@ async function startCamera() {
     stillDuration = 0;
     motionEnergy = 0;
     accumulatedMotion = 0.22;
-    startTimestamp = performance.now();
+    validStartTimestamp = 0;
     lastDeepCaptureTime = 0;
 
     captureFrame();
@@ -1197,7 +1202,7 @@ function drawMirroredSource(targetCanvas, targetW, targetH) {
 }
 
 // --------------------------------------------------
-// CAPTURE FRAME (表層 + 適応型深層キャプチャ)
+// CAPTURE FRAME (表層 + 適応型深層キャプチャ・真っ暗フレーム除外)
 // --------------------------------------------------
 
 function captureFrame() {
@@ -1210,15 +1215,23 @@ function captureFrame() {
   entry.time = now;
   frames.push(entry);
 
-  updateMotionAccumulation(entry.canvas, CAPTURE_INTERVAL);
+  const avgBrightness = updateMotionAccumulation(entry.canvas, CAPTURE_INTERVAL);
 
   const oldestAllowed = now - HISTORY_DURATION;
   while (frames.length > 0 && frames[0].time < oldestAllowed) {
     framePool.push(frames.shift());
   }
 
-  // 深層記憶の適応型キャプチャ
-  const elapsed = now - startTimestamp;
+  // カメラの露出が立ち上がる前の真っ暗フレーム（輝度3.0未満）は深層記憶に入れない
+  if (avgBrightness < 3.0) {
+    return;
+  }
+
+  if (validStartTimestamp === 0) {
+    validStartTimestamp = now;
+  }
+
+  const elapsed = now - validStartTimestamp;
   const targetDeepInterval = elapsed < DEEP_WARMUP_MS ? DEEP_FAST_INTERVAL : DEEP_SLOW_INTERVAL;
 
   if (now - lastDeepCaptureTime >= targetDeepInterval) {
@@ -1229,8 +1242,8 @@ function captureFrame() {
     deepFrames.push(deepEntry);
 
     const oldestDeepAllowed = now - DEEP_DURATION;
-    while (deepFrames.length > 2 && deepFrames[1].time < oldestDeepAllowed) {
-      deepPool.push(deepFrames.splice(1, 1)[0]);
+    while (deepFrames.length > 1 && deepFrames[0].time < oldestDeepAllowed) {
+      deepPool.push(deepFrames.shift());
     }
   }
 }
@@ -1276,7 +1289,6 @@ function render(now) {
     const organicWave = 1 - DRIFT_DEPTH + DRIFT_DEPTH * noise;
 
     if (tile.isDeep && deepFrames.length > 0) {
-      // 【遅い層（4〜6マス）】分割の一部ではなく、「数分前のカメラ全体像」をマス内に丸ごと映す
       const targetMaxDelay = Math.min(tile.deepDelay, availableDeepSpan * (0.45 + tile.deepRatio * 0.55));
       const deepJitter = (noise - 0.5) * Math.min(4000, availableDeepSpan * 0.15);
       const effectiveDeepDelay = Math.max(1500, targetMaxDelay + deepJitter);
@@ -1288,7 +1300,6 @@ function render(now) {
       const dstW = tile.canvas.width;
       const dstH = tile.canvas.height;
 
-      // タイルのアスペクト比に合わせてカメラ全体が自然に収まるようセンタークロップ描画（歪み防止）
       const srcRatio = srcW / srcH;
       const dstRatio = dstW / dstH;
       let sx = 0, sy = 0, sw = srcW, sh = srcH;
@@ -1302,7 +1313,6 @@ function render(now) {
 
       tile.ctx.drawImage(frame, sx, sy, sw, sh, 0, 0, dstW, dstH);
     } else {
-      // 【表層（通常マス）】現在〜2.6秒前の空間分割パーツ
       const effectiveDelay = tile.delay * surfaceSpan * organicWave;
       const frame = getFrameFromBuffer(frames, effectiveDelay, now);
       if (!frame) continue;
