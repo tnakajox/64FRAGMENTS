@@ -790,10 +790,11 @@ footer {
 
 <script>
 // ==================================================
-// 64 FRAGMENTS — script block
-// ・全体レイヤー（背景） : カメラ映像「全体」が数分前〜数十秒前の過去として連続再生される
-// ・64分割レイヤー（前景） : 動いた場所の断片だけが窓のように開き、「現在の自分」が浮かび上がる
-// ・立ち去った後 : 窓がすべて閉じ、画面全体には「数分前の誰かの姿」だけがポツンと残る
+// 64 FRAGMENTS — script block (Ars Electronica 2027 edition)
+// ・時間の二層化 : 表層(2.6s・空間分割パーツ) + 深層(最大180s・4〜6マスのみ「数分前のカメラ全体」を内包)
+// ・起動直後の高速立ち上がり：最初の15秒は高密度に深層履歴を蓄積し、以降3分スケールへ移行
+// ・戻りきらない収束 : 静止すると表層は追いつくが、遅い層の「過去の全体像」だけが残り続ける
+// ・動きの累積量駆動 + 非周期ノイズ揺らぎ + 顔中心(現在寄り)/外周(過去寄り)
 // ==================================================
 
 const GRID_SIZE = 8;
@@ -801,29 +802,32 @@ const GRID_SIZE = 8;
 const FRAME_WIDTH = 640;
 const FRAME_HEIGHT = 480;
 
-// --- 表層バッファ（現在の窓用：45ms間隔・最大2.6秒） ---
+// --- 表層バッファ（約2.6秒・45ms間隔） ---
 const CAPTURE_INTERVAL = 45;
 const HISTORY_DURATION = 2600;
-const MAX_DELAY = 1400; // 窓内の微細な時間差
+const MAX_DELAY = 2200;
 
-// --- 全体過去バッファ（カメラ全体が遅れて流れる層：起動直後高速→以降1秒1枚・最大180秒） ---
-const DEEP_FAST_INTERVAL = 180;
-const DEEP_SLOW_INTERVAL = 1000;
-const DEEP_WARMUP_MS = 15000;
-const DEEP_DURATION = 180000;
-const DEEP_WIDTH = 480;
-const DEEP_HEIGHT = 360;
-const TARGET_PAST_DELAY = 45000; // 定常時の全体遅延（約45秒前〜最大3分前）
+// --- 深層記憶バッファ（起動直後は高速蓄積 → 以降1秒1枚・最大180秒保持） ---
+const DEEP_FAST_INTERVAL = 180; // 起動直後15秒間の高速キャプチャ間隔(ms)
+const DEEP_SLOW_INTERVAL = 1000;// 通常時のキャプチャ間隔(ms)
+const DEEP_WARMUP_MS = 15000;   // 高速蓄積フェーズの長さ(15秒)
+const DEEP_DURATION = 180000;   // 最大3分間保持
+const DEEP_WIDTH = 320;
+const DEEP_HEIGHT = 240;
+const DEEP_TILE_MIN = 4;        // 遅い層を参照するマス数（最小）
+const DEEP_TILE_MAX = 6;        // 遅い層を参照するマス数（最大）
+const DEEP_MIN_DELAY = 18000;   // 定常時の最小遅延 (18秒)
+const DEEP_MAX_DELAY = 165000;  // 定常時の最大遅延 (165秒)
 
-// --- 暗所対応・8×8セル別動き検出 ---
+// --- 非周期の揺らぎ ---
+const DRIFT_DEPTH = 0.28;
+
+// --- 暗所対応・動き検出（64x48 平滑化差分） ---
 const MOTION_W = 64;
 const MOTION_H = 48;
 
 const grid = document.getElementById("grid");
 const stage = document.getElementById("stage");
-const pastLayer = document.getElementById("pastLayer");
-const pastCtx = pastLayer.getContext("2d", { alpha: false });
-
 const overlay = document.getElementById("overlay");
 const overlayTitle = document.getElementById("overlayTitle");
 const overlayText = document.getElementById("overlayText");
@@ -856,14 +860,14 @@ let captureTimer = null;
 
 let tiles = [];
 
-// 8x8グリッドごとの動きエネルギー（動いた場所の窓が開く）
-const cellMotion = new Float32Array(GRID_SIZE * GRID_SIZE);
+// 動きの累積状態
 let motionCanvas = null;
 let motionCtx = null;
 let prevBlurredLuma = null;
 let noiseFloor = 2.8;
 let stillDuration = 0;
-let globalMotionEnergy = 0;
+let motionEnergy = 0;
+let accumulatedMotion = 0.25;
 
 function makeCanvas(w, h) {
   const c = document.createElement("canvas");
@@ -881,7 +885,7 @@ function aperiodicNoise(tSec, seed) {
 }
 
 // --------------------------------------------------
-// BUILD GRID (64個の現在窓)
+// BUILD GRID (顔中心=現在寄り / 外周=過去寄り / 遅い層4〜6マスはカメラ全体)
 // --------------------------------------------------
 
 function generateTiles(asymmetric = true) {
@@ -964,15 +968,16 @@ function generateTiles(asymmetric = true) {
       tile.appendChild(canvas);
       grid.appendChild(tile);
 
-      // 顔の中心は現在寄り（遅延ほぼ0）、周辺ほどわずかに時間差
       const cx = x + w * 0.5;
       const cy = y + h * 0.5;
       const radial = Math.min(1, Math.hypot(cx - faceCenterX, cy - faceCenterY) / 4.8);
-      const normalized = Math.min(1, Math.max(0, Math.pow(radial, 1.4) * 0.75 + Math.random() * 0.25));
+      const radialCurve = Math.pow(radial, 1.35);
+      const jitter = Math.random();
+      const normalized = Math.min(1, Math.max(0, radialCurve * 0.78 + jitter * 0.22));
       const delay = Math.round(normalized * MAX_DELAY);
 
-      const zoom = 1.0 + Math.random() * 0.06;
-      const noiseSeed = x * 13.7 + y * 29.3 + Math.random() * 19.1;
+      const zoom = 1.0 + Math.random() * 0.07;
+      const noiseSeed = (x * 13.7 + y * 29.3 + Math.random() * 19.1);
 
       tiles.push({
         element: tile,
@@ -986,9 +991,34 @@ function generateTiles(asymmetric = true) {
         delay,
         zoom,
         noiseSeed,
-        openness: 0 // 0=背後の「全体過去」が透けて見える / 1=「現在の断片」がくっきり現れる
+        isDeep: false,
+        deepRatio: 0,
+        deepDelay: 0
       });
     }
+  }
+
+  // 遅い層（カメラ全体像を映す小窓）の候補選定
+  // 全体像が歪まず見やすいよう、正方形に近いタイル（1×1 または 2×2）を優先して4〜6個選ぶ
+  const deepCount = Math.min(
+    tiles.length,
+    DEEP_TILE_MIN + Math.floor(Math.random() * (DEEP_TILE_MAX - DEEP_TILE_MIN + 1))
+  );
+
+  const candidates = tiles
+    .map((t, idx) => {
+      const squareBonus = t.w === t.h ? 0.35 : 0;
+      return { idx, score: t.radial * 0.65 + squareBonus + Math.random() * 0.5 };
+    })
+    .filter(item => tiles[item.idx].radial > 0.24)
+    .sort((a, b) => b.score - a.score);
+
+  for (let i = 0; i < Math.min(deepCount, candidates.length); i++) {
+    const t = tiles[candidates[i].idx];
+    t.isDeep = true;
+    t.deepRatio = Math.min(1, (i + 0.35 + Math.random() * 0.5) / deepCount);
+    t.deepDelay = Math.round(DEEP_MIN_DELAY + t.deepRatio * (DEEP_MAX_DELAY - DEEP_MIN_DELAY));
+    t.element.classList.add("deep-past");
   }
 
   gridCaption.textContent = asymmetric
@@ -999,10 +1029,10 @@ function generateTiles(asymmetric = true) {
 generateTiles(true);
 
 // --------------------------------------------------
-// CELL-BY-CELL MOTION ANALYSIS (暗所ノイズ平滑化 + 8x8セル別動き量)
+// MOTION ANALYSIS
 // --------------------------------------------------
 
-function updateMotionGrid(sourceCanvas, dtMs) {
+function updateMotionAccumulation(sourceCanvas, dtMs) {
   if (!motionCanvas) {
     motionCanvas = makeCanvas(MOTION_W, MOTION_H);
     motionCtx = motionCanvas.getContext("2d", { willReadFrequently: true });
@@ -1033,62 +1063,45 @@ function updateMotionGrid(sourceCanvas, dtMs) {
     return;
   }
 
-  const cellW = MOTION_W / GRID_SIZE; // 8px
-  const cellH = MOTION_H / GRID_SIZE; // 6px
-  let totalDiff = 0;
-  let activeCount = 0;
+  let diffSum = 0;
+  let activePixels = 0;
+  const totalInner = (MOTION_W - 2) * (MOTION_H - 2);
 
-  for (let gy = 0; gy < GRID_SIZE; gy++) {
-    for (let gx = 0; gx < GRID_SIZE; gx++) {
-      let cellSum = 0;
-      let samples = 0;
-      const startY = Math.max(1, Math.floor(gy * cellH));
-      const endY = Math.min(MOTION_H - 1, Math.floor((gy + 1) * cellH));
-      const startX = Math.max(1, Math.floor(gx * cellW));
-      const endX = Math.min(MOTION_W - 1, Math.floor((gx + 1) * cellW));
-
-      for (let y = startY; y < endY; y++) {
-        for (let x = startX; x < endX; x++) {
-          const idx = y * MOTION_W + x;
-          const d = Math.abs(blurred[idx] - prevBlurredLuma[idx]);
-          cellSum += d;
-          samples++;
-          if (d > noiseFloor * 2.1) activeCount++;
-        }
-      }
-
-      const avgCellDiff = samples > 0 ? cellSum / samples : 0;
-      totalDiff += avgCellDiff;
-
-      const cIdx = gy * GRID_SIZE + gx;
-      const impulse = Math.max(0, (avgCellDiff - noiseFloor * 1.15) / 11.0);
-      const clamped = Math.min(1.0, impulse);
-
-      if (clamped > cellMotion[cIdx]) {
-        // 動いた瞬間にスッと現在の窓が開く
-        cellMotion[cIdx] = cellMotion[cIdx] * 0.45 + clamped * 0.55;
-      } else {
-        // 止まると数秒かけてゆっくり窓が閉じ、全体の過去映像へ沈んでいく
-        cellMotion[cIdx] = Math.max(0, cellMotion[cIdx] - 0.32 * (dtMs / 1000));
+  for (let y = 1; y < MOTION_H - 1; y++) {
+    for (let x = 1; x < MOTION_W - 1; x++) {
+      const idx = y * MOTION_W + x;
+      const d = Math.abs(blurred[idx] - prevBlurredLuma[idx]);
+      diffSum += d;
+      if (d > noiseFloor * 2.2) {
+        activePixels++;
       }
     }
   }
 
   prevBlurredLuma = blurred;
 
-  const meanAll = totalDiff / (GRID_SIZE * GRID_SIZE);
-  const activeRatio = activeCount / ((MOTION_W - 2) * (MOTION_H - 2));
+  const meanDiff = diffSum / totalInner;
+  const activeRatio = activePixels / totalInner;
 
   if (activeRatio < 0.015) {
     stillDuration += dtMs;
     if (stillDuration > 4000) {
-      noiseFloor = noiseFloor * 0.96 + Math.max(1.2, meanAll * 1.35) * 0.04;
+      noiseFloor = noiseFloor * 0.96 + Math.max(1.2, meanDiff * 1.35) * 0.04;
     }
   } else {
     stillDuration = 0;
   }
 
-  globalMotionEnergy = globalMotionEnergy * 0.8 + Math.min(1, activeRatio * 3.5) * 0.2;
+  const rawMotion = Math.max(0, (meanDiff - noiseFloor) / 14.0) + activeRatio * 1.4;
+  const instant = Math.min(1, rawMotion);
+  motionEnergy = motionEnergy * 0.72 + instant * 0.28;
+
+  if (motionEnergy > 0.04) {
+    accumulatedMotion = Math.min(1.0, accumulatedMotion + motionEnergy * (dtMs / 1000) * 0.55);
+  } else {
+    const decayRate = 0.08 + (1.0 - accumulatedMotion) * 0.22;
+    accumulatedMotion = Math.max(0.0, accumulatedMotion - decayRate * (dtMs / 1000));
+  }
 }
 
 // --------------------------------------------------
@@ -1123,10 +1136,10 @@ async function startCamera() {
     framePool = [];
     deepFrames = [];
     deepPool = [];
-    cellMotion.fill(0.85); // 起動直後は現在が見え、数秒かけて過去層へ沈んでいく
     prevBlurredLuma = null;
     stillDuration = 0;
-    globalMotionEnergy = 0;
+    motionEnergy = 0;
+    accumulatedMotion = 0.22;
     startTimestamp = performance.now();
     lastDeepCaptureTime = 0;
 
@@ -1184,7 +1197,7 @@ function drawMirroredSource(targetCanvas, targetW, targetH) {
 }
 
 // --------------------------------------------------
-// CAPTURE FRAME (表層 + 全体過去バッファ)
+// CAPTURE FRAME (表層 + 適応型深層キャプチャ)
 // --------------------------------------------------
 
 function captureFrame() {
@@ -1197,14 +1210,14 @@ function captureFrame() {
   entry.time = now;
   frames.push(entry);
 
-  updateMotionGrid(entry.canvas, CAPTURE_INTERVAL);
+  updateMotionAccumulation(entry.canvas, CAPTURE_INTERVAL);
 
   const oldestAllowed = now - HISTORY_DURATION;
   while (frames.length > 0 && frames[0].time < oldestAllowed) {
     framePool.push(frames.shift());
   }
 
-  // 全体過去バッファ：最初の15秒は高密度蓄積し、以降は1秒1枚で最大3分間保持
+  // 深層記憶の適応型キャプチャ
   const elapsed = now - startTimestamp;
   const targetDeepInterval = elapsed < DEEP_WARMUP_MS ? DEEP_FAST_INTERVAL : DEEP_SLOW_INTERVAL;
 
@@ -1252,67 +1265,73 @@ function render(now) {
   const tSec = now * 0.001;
   status.innerHTML = `<span>●</span> LIVE / ${tiles.length} TEMPORAL FRAGMENTS`;
 
-  // 1. まず背景（全体層）に「カメラ全体の過去映像」を連続描画する
-  // 起動直後は溜まっている最古の記憶〜45秒前の過去へ自然に広がっていく
-  if (deepFrames.length > 0) {
-    const availableSpan = Math.max(0, now - deepFrames[0].time);
-    const pastDelay = Math.min(TARGET_PAST_DELAY, availableSpan * 0.85);
-    const fullPastFrame = getFrameFromBuffer(deepFrames, pastDelay, now);
-    if (fullPastFrame) {
-      pastCtx.drawImage(fullPastFrame, 0, 0, pastLayer.width, pastLayer.height);
-    }
-  }
+  const surfaceSpan = 0.04 + 0.96 * Math.pow(accumulatedMotion, 0.85);
 
-  // 2. 前景の64断片：動いた場所のタイルだけ窓が開き、「現在の自分」が現れる
+  const availableDeepSpan = deepFrames.length > 1
+    ? Math.max(0, now - deepFrames[0].time)
+    : 0;
+
   for (const tile of tiles) {
-    // タイルが覆う8x8セル内の最大動き量を取得
-    let maxCellEnergy = 0;
-    for (let yy = tile.y; yy < tile.y + tile.h; yy++) {
-      for (let xx = tile.x; xx < tile.x + tile.w; xx++) {
-        const e = cellMotion[yy * GRID_SIZE + xx];
-        if (e > maxCellEnergy) maxCellEnergy = e;
-      }
-    }
-
-    // 周囲のタイルへのわずかな波及＋非周期の微細な呼吸
     const noise = aperiodicNoise(tSec, tile.noiseSeed);
-    const targetOpen = Math.min(1, maxCellEnergy * 1.45 + globalMotionEnergy * 0.15 * noise);
-    tile.openness = tile.openness * 0.82 + targetOpen * 0.18;
+    const organicWave = 1 - DRIFT_DEPTH + DRIFT_DEPTH * noise;
 
-    // 動きがほぼゼロになったタイルは完全に透明になり、背後の「全体過去映像」がそのまま見える
-    if (tile.openness < 0.03) {
-      tile.element.style.opacity = "0";
-      continue;
+    if (tile.isDeep && deepFrames.length > 0) {
+      // 【遅い層（4〜6マス）】分割の一部ではなく、「数分前のカメラ全体像」をマス内に丸ごと映す
+      const targetMaxDelay = Math.min(tile.deepDelay, availableDeepSpan * (0.45 + tile.deepRatio * 0.55));
+      const deepJitter = (noise - 0.5) * Math.min(4000, availableDeepSpan * 0.15);
+      const effectiveDeepDelay = Math.max(1500, targetMaxDelay + deepJitter);
+      const frame = getFrameFromBuffer(deepFrames, effectiveDeepDelay, now);
+      if (!frame) continue;
+
+      const srcW = frame.width;
+      const srcH = frame.height;
+      const dstW = tile.canvas.width;
+      const dstH = tile.canvas.height;
+
+      // タイルのアスペクト比に合わせてカメラ全体が自然に収まるようセンタークロップ描画（歪み防止）
+      const srcRatio = srcW / srcH;
+      const dstRatio = dstW / dstH;
+      let sx = 0, sy = 0, sw = srcW, sh = srcH;
+      if (srcRatio > dstRatio) {
+        sw = srcH * dstRatio;
+        sx = (srcW - sw) / 2;
+      } else {
+        sh = srcW / dstRatio;
+        sy = (srcH - sh) / 2;
+      }
+
+      tile.ctx.drawImage(frame, sx, sy, sw, sh, 0, 0, dstW, dstH);
+    } else {
+      // 【表層（通常マス）】現在〜2.6秒前の空間分割パーツ
+      const effectiveDelay = tile.delay * surfaceSpan * organicWave;
+      const frame = getFrameFromBuffer(frames, effectiveDelay, now);
+      if (!frame) continue;
+
+      const srcW = frame.width;
+      const srcH = frame.height;
+
+      const baseX = tile.x * (srcW / GRID_SIZE);
+      const baseY = tile.y * (srcH / GRID_SIZE);
+      const baseW = tile.w * (srcW / GRID_SIZE);
+      const baseH = tile.h * (srcH / GRID_SIZE);
+
+      const sw = baseW / tile.zoom;
+      const sh = baseH / tile.zoom;
+      const sx = baseX + (baseW - sw) / 2;
+      const sy = baseY + (baseH - sh) / 2;
+
+      tile.ctx.drawImage(
+        frame,
+        sx,
+        sy,
+        sw,
+        sh,
+        0,
+        0,
+        tile.canvas.width,
+        tile.canvas.height
+      );
     }
-
-    tile.element.style.opacity = Math.min(1, tile.openness * 1.25).toFixed(3);
-
-    const organicWave = 0.75 + 0.25 * noise;
-    const effectiveDelay = tile.delay * organicWave;
-    const frame = getFrameFromBuffer(frames, effectiveDelay, now);
-    if (!frame) continue;
-
-    const baseX = tile.x * (FRAME_WIDTH / GRID_SIZE);
-    const baseY = tile.y * (FRAME_HEIGHT / GRID_SIZE);
-    const baseW = tile.w * (FRAME_WIDTH / GRID_SIZE);
-    const baseH = tile.h * (FRAME_HEIGHT / GRID_SIZE);
-
-    const sw = baseW / tile.zoom;
-    const sh = baseH / tile.zoom;
-    const sx = baseX + (baseW - sw) / 2;
-    const sy = baseY + (baseH - sh) / 2;
-
-    tile.ctx.drawImage(
-      frame,
-      sx,
-      sy,
-      sw,
-      sh,
-      0,
-      0,
-      tile.canvas.width,
-      tile.canvas.height
-    );
   }
 
   animationId = requestAnimationFrame(render);
@@ -1364,7 +1383,6 @@ function stopCamera() {
   framePool = [];
   deepFrames = [];
   deepPool = [];
-  cellMotion.fill(0);
   prevBlurredLuma = null;
   stream = null;
   video = null;
